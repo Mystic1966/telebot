@@ -35,7 +35,8 @@ logger = logging.getLogger(__name__)
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 PHONE_NUMBER = os.getenv("PHONE_NUMBER")
-TARGET_GROUP = int(os.getenv("TARGET_GROUP", "-1002732639317"))
+TARGET_GROUP = int(os.getenv("TARGET_GROUP", "-1003488487424"))
+
 
 MAX_CONCURRENT_GROUPS = 3
 MESSAGE_BATCH_SIZE = 20
