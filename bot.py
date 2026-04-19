@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 PHONE_NUMBER = os.getenv("PHONE_NUMBER", "")
-TARGET_GROUP = os.getenv("TARGET_GROUP", "@Devilapprovedcc")
+SOURCE_GROUP = os.getenv("SOURCE_GROUP", "@Devilapprovedcc")
+TARGET_GROUP = os.getenv("TARGET_GROUP", "@ccdumpgroup")
 PYROGRAM_SESSION = os.getenv("PYROGRAM_SESSION", "")
 
 MAX_CONCURRENT_GROUPS = 3
@@ -92,7 +93,7 @@ async def get_all_groups_and_channels():
             dialog_count += 1
             chat = dialog.chat
             if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                if chat.id != TARGET_GROUP and chat.username != TARGET_GROUP.lstrip("@"):
+                if chat.id != SOURCE_GROUP and chat.username != SOURCE_GROUP.lstrip("@"):
                     groups_and_channels.append({
                         "id": chat.id,
                         "title": chat.title or f"Chat_{chat.id}",
@@ -100,7 +101,7 @@ async def get_all_groups_and_channels():
                         "username": getattr(chat, "username", None)
                     })
                 else:
-                    logger.info(f"⚠️ Skipped target group: {chat.title} - ID: {chat.id}")
+                    logger.info(f"⚠️ Skipped source group: {chat.title} - ID: {chat.id}")
 
         logger.info(f"✅ Processed {dialog_count} dialogs")
         logger.info(f"✅ Discovered {len(groups_and_channels)} groups/channels")
