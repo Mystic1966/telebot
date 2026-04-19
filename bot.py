@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 PHONE_NUMBER = os.getenv("PHONE_NUMBER", "")
-SOURCE_GROUP = int(os.getenv("SOURCE_GROUP", "-1003488487424"))
 TARGET_GROUP = os.getenv("TARGET_GROUP", "@ccdumpgroup")
 PYROGRAM_SESSION = os.getenv("PYROGRAM_SESSION", "")
 
@@ -50,7 +49,6 @@ last_processed_message_ids = {}
 processed_messages = set()
 source_groups = []
 bin_cache = {}
-processing_semaphore = None
 
 def is_approved_message(text):
     if not text:
@@ -93,15 +91,12 @@ async def get_all_groups_and_channels():
             dialog_count += 1
             chat = dialog.chat
             if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                if chat.id != SOURCE_GROUP:
-                    groups_and_channels.append({
-                        "id": chat.id,
-                        "title": chat.title or f"Chat_{chat.id}",
-                        "type": str(chat.type),
-                        "username": getattr(chat, "username", None)
-                    })
-                else:
-                    logger.info(f"⚠️ Skipped source group: {chat.title} - ID: {chat.id}")
+                groups_and_channels.append({
+                    "id": chat.id,
+                    "title": chat.title or f"Chat_{chat.id}",
+                    "type": str(chat.type),
+                    "username": getattr(chat, "username", None)
+                })
 
         logger.info(f"✅ Processed {dialog_count} dialogs")
         logger.info(f"✅ Discovered {len(groups_and_channels)} groups/channels")
@@ -136,8 +131,8 @@ def extract_credit_cards(text):
         r'\b(\d{13,19})\|(\d{1,2})\|(\d{2,4})\|(\d{3,4})\b',
         r'\b(\d{13,19})\s*\|\s*(\d{1,2})\s*\|\s*(\d{2,4})\s*\|\s*(\d{3,4})\b',
         r'\b(\d{13,19})\D+(\d{1,2})\D+(\d{2,4})\D+(\d{3,4})\b',
-        r'(\d{13,19})\s*[\|\/\-:\s]\s*(\d{1,2})\s*[\|\/\-:\s]\s*(\d{2,4})\s*[\|\/\-:\s]\s*(\d{3,4})',
-        r'(\d{4})\s*(\d{4})\s*(\d{4})\s*(\d{4})\s*[\|\/\-:\s]\s*(\d{1,2})\s*[\|\/\-:\s]\s*(\d{2,4})\s*[\|\/\-:\s]\s*(\d{3,4})',
+        r'(\d{13,19})\s*[\|/\-:\s]\s*(\d{1,2})\s*[\|/\-:\s]\s*(\d{2,4})\s*[\|/\-:\s]\s*(\d{3,4})',
+        r'(\d{4})\s*(\d{4})\s*(\d{4})\s*(\d{4})\s*[\|/\-:\s]\s*(\d{1,2})\s*[\|/\-:\s]\s*(\d{2,4})\s*[\|/\-:\s]\s*(\d{3,4})',
     ]
 
     credit_cards = []
@@ -214,7 +209,7 @@ async def send_to_target_group(formatted_message, cc_data):
     except Exception as e:
         logger.error(f"❌ Send failed: {e}")
 
-async def process_message_for_approved_ccs(message, source_group_id, group_title="Unknown"):
+async def process_message_for_approved_ccs(message, group_title="Unknown"):
     global processed_messages
     try:
         if message.id in processed_messages:
@@ -276,7 +271,7 @@ async def process_single_group(group_info):
         if new_messages:
             new_messages.reverse()
             tasks = [
-                asyncio.create_task(process_message_for_approved_ccs(message, group_id, group_title))
+                asyncio.create_task(process_message_for_approved_ccs(message, group_title))
                 for message in new_messages
             ]
             await asyncio.gather(*tasks, return_exceptions=True)
