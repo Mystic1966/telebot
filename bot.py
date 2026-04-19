@@ -24,7 +24,7 @@ except ImportError:
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -50,36 +50,63 @@ processed_messages = set()
 source_groups = []
 bin_cache = {}
 
+def normalize_text(text):
+    return (text or "").strip()
+
 def is_approved_message(text):
     if not text:
         return False
 
     text_lower = text.lower()
     approved_patterns = [
-        r'approved\s*✅',
-        r'𝗔𝗣𝗣𝗥𝗢𝗩𝗘𝗗\s*✅',
-        r'𝐀𝐩𝐩𝐫𝐨𝐯𝐞𝐝\s*✅',
-        r'status:\s*approved',
-        r'response:\s*approved',
-        r'charged\s*💎',
-        r'charged\s*✅',
-        r'status:\s*charged',
-        r'payment\s+successful\s*✅',
-        r'response:\s*payment\s+successful',
-        r'response:\s*\$[\d.]+\s+charged',
-        r'response:\s*order_placed',
-        r'response:\s*thank\s+you',
-        r'message:\s*charged\s+\$?[\d.]',
-        r'response:\s*payment\s+method\s+added\s+successfully',
-        r'\$[\d.]+\s+charged!',
-        r'Approved',
-        r'approved',
-        r'Charged',
-        r'charged',
-        r'LIVE',
-        r'Card added',
+        r"\bapproved\b",
+        r"\bstatus:\s*approved\b",
+        r"\bresponse:\s*card\s+added\b",
+        r"\bcard\s+added\b",
+        r"\bcharged\b",
+        r"\blive\b",
     ]
     return any(re.search(pattern, text_lower, re.IGNORECASE) for pattern in approved_patterns)
+
+def extract_message_fields(text):
+    if not text:
+        return {}
+
+    fields = {}
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+    for line in lines:
+        if ":" in line:
+            key, value = line.split(":", 1)
+            fields[key.strip().lower()] = value.strip()
+
+    return fields
+
+def extract_credit_cards(text):
+    if not text:
+        return []
+
+    patterns = [
+        r"\b(\d{13,19})\|(\d{1,2})\|(\d{2,4})\|(\d{3,4})\b",
+        r"\b(\d{13,19})\s*\|\s*(\d{1,2})\s*\|\s*(\d{2,4})\s*\|\s*(\d{3,4})\b",
+        r"\b(\d{13,19})\D+(\d{1,2})\D+(\d{2,4})\D+(\d{3,4})\b",
+        r"(\d{13,19})\s*[\|/\-:\s]\s*(\d{1,2})\s*[\|/\-:\s]\s*(\d{2,4})\s*[\|/\-:\s]\s*(\d{3,4})",
+        r"(\d{4})\s*(\d{4})\s*(\d{4})\s*(\d{4})\s*[\|/\-:\s]\s*(\d{1,2})\s*[\|/\-:\s]\s*(\d{2,4})\s*[\|/\-:\s]\s*(\d{3,4})",
+    ]
+
+    credit_cards = []
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
+        for match in matches:
+            if len(match) == 4:
+                card_number, month, year, cvv = match
+                card_number = re.sub(r"[\s\-]", "", card_number)
+                if 13 <= len(card_number) <= 19 and 1 <= int(month) <= 12 and len(cvv) >= 3:
+                    if len(year) == 4:
+                        year = year[-2:]
+                    credit_cards.append(f"{card_number}|{month.zfill(2)}|{year}|{cvv}")
+
+    return list(dict.fromkeys(credit_cards))
 
 async def get_all_groups_and_channels():
     try:
@@ -123,76 +150,27 @@ async def safe_get_chat_history(chat_id, limit=20):
     except Exception:
         return []
 
-def extract_credit_cards(text):
-    if not text:
-        return []
+def format_card_message(fields, cc_data):
+    status = fields.get("status", "Unknown")
+    response = fields.get("response", "Unknown")
+    gateway = fields.get("gateway", "Unknown")
+    bank = fields.get("bank", "Unknown")
+    card_type = fields.get("type", "Unknown")
+    country = fields.get("country", "Unknown")
+    checked_by = fields.get("checked by", "Unknown")
+    credits_left = fields.get("credits left", "Unknown")
 
-    patterns = [
-        r'\b(\d{13,19})\|(\d{1,2})\|(\d{2,4})\|(\d{3,4})\b',
-        r'\b(\d{13,19})\s*\|\s*(\d{1,2})\s*\|\s*(\d{2,4})\s*\|\s*(\d{3,4})\b',
-        r'\b(\d{13,19})\D+(\d{1,2})\D+(\d{2,4})\D+(\d{3,4})\b',
-        r'(\d{13,19})\s*[\|/\-:\s]\s*(\d{1,2})\s*[\|/\-:\s]\s*(\d{2,4})\s*[\|/\-:\s]\s*(\d{3,4})',
-        r'(\d{4})\s*(\d{4})\s*(\d{4})\s*(\d{4})\s*[\|/\-:\s]\s*(\d{1,2})\s*[\|/\-:\s]\s*(\d{2,4})\s*[\|/\-:\s]\s*(\d{3,4})',
-    ]
-
-    credit_cards = []
-    for pattern in patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
-        for match in matches:
-            if len(match) == 4:
-                card_number, month, year, cvv = match
-                card_number = re.sub(r'[\s\-]', '', card_number)
-                if 13 <= len(card_number) <= 19 and 1 <= int(month) <= 12 and len(cvv) >= 3:
-                    if len(year) == 4:
-                        year = year[-2:]
-                    credit_cards.append(f"{card_number}|{month.zfill(2)}|{year}|{cvv}")
-
-    return list(dict.fromkeys(credit_cards))
-
-async def get_bin_info(bin_number):
-    global bin_cache
-
-    if bin_number in bin_cache:
-        return bin_cache[bin_number]
-
-    try:
-        timeout = aiohttp.ClientTimeout(total=3)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(f"https://bins.antipublic.cc/bins/{bin_number}") as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if len(bin_cache) > BIN_CACHE_SIZE:
-                        bin_cache = dict(list(bin_cache.items())[-BIN_CACHE_SIZE // 2:])
-                    bin_cache[bin_number] = data
-                    return data
-    except Exception:
-        return None
-
-    return None
-
-def format_card_message(cc_data, bin_info):
-    scheme = "UNKNOWN"
-    card_type = "UNKNOWN"
-    brand = "UNKNOWN"
-    bank_name = "UNKNOWN BANK"
-    country_name = "UNKNOWN"
-    country_emoji = "🌍"
-
-    if bin_info:
-        brand = bin_info.get("brand", "UNKNOWN")
-        scheme = brand
-        card_type = bin_info.get("type", "UNKNOWN").upper()
-        bank_name = bin_info.get("bank", "UNKNOWN BANK")
-        country_name = bin_info.get("country_name", "UNKNOWN")
-        country_emoji = bin_info.get("country_flag", "🌍")
-
-    return f"""𝘾𝘼𝙍𝘿 ⇾ {cc_data}
-𝙎𝙏𝘼𝙏𝙐𝙎 ⇾ 𝘈𝘱𝘱𝘳𝘖𝘝𝘌𝘋 💎
-𝙈𝙀𝙎𝙎𝘼𝙂𝙀 ⇾ 𝘚𝘊𝘙𝘈𝘗𝘗𝘌𝘋 𝘚𝘌𝘹'𝘊𝘌𝘚𝘚𝘍𝘜𝘓𝘓𝘺
-𝙂𝘼𝙏𝙀𝙒𝘼𝙔 ⇾ 𝘚𝘊𝘙𝘈𝘗𝘗𝘌𝙍 🍑
-𝙄𝙉𝙁𝙊 ⇾ {scheme} - {card_type} - {brand}
-𝘽𝘼𝙉𝙆 ⇾ {bank_name}
-𝘾𝙊𝙐𝙉𝙏𝙍𝙔 ⇾ {country_name} {country_emoji}"""
+    return (
+        f"CC: {cc_data}\n"
+        f"Status: {status}\n"
+        f"Response: {response}\n"
+        f"Gateway: {gateway}\n"
+        f"Bank: {bank}\n"
+        f"Type: {card_type}\n"
+        f"Country: {country}\n"
+        f"Checked by: {checked_by}\n"
+        f"Credits left: {credits_left}"
+    )
 
 async def send_to_target_group(formatted_message, cc_data):
     try:
@@ -219,28 +197,29 @@ async def process_message_for_approved_ccs(message, group_title="Unknown"):
         if len(processed_messages) > 5000:
             processed_messages = set(list(processed_messages)[-2000:])
 
-        text = message.text or message.caption
-        if not text or not is_approved_message(text):
+        text = normalize_text(message.text or message.caption)
+        if not text:
             return
 
+        if not is_approved_message(text):
+            return
+
+        fields = extract_message_fields(text)
         credit_cards = extract_credit_cards(text)
+
         if not credit_cards:
             return
 
         logger.info(f"🎯 {len(credit_cards)} CCs from {group_title[:20]}")
-        tasks = [asyncio.create_task(process_single_cc(cc)) for cc in credit_cards]
+        tasks = []
+        for cc in credit_cards:
+            formatted_message = format_card_message(fields, cc)
+            tasks.append(asyncio.create_task(send_to_target_group(formatted_message, cc)))
+
         await asyncio.gather(*tasks, return_exceptions=True)
+
     except Exception as e:
         logger.error(f"❌ Error processing message: {e}")
-
-async def process_single_cc(cc_data):
-    try:
-        bin_number = cc_data.split("|")[0][:6]
-        bin_info = await get_bin_info(bin_number)
-        formatted_message = format_card_message(cc_data, bin_info)
-        await send_to_target_group(formatted_message, cc_data)
-    except Exception as e:
-        logger.error(f"❌ Error processing CC: {e}")
 
 async def process_group_batch(group_batch):
     for group_info in group_batch:
@@ -280,8 +259,8 @@ async def process_single_group(group_info):
                 last_processed_message_ids.get(group_id, 0),
                 max(msg.id for msg in new_messages)
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"❌ Error processing group {group_title}: {e}")
 
 async def poll_multiple_groups():
     global is_running, source_groups
