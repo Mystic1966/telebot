@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 PHONE_NUMBER = os.getenv("PHONE_NUMBER", "")
-TARGET_GROUP = int(os.getenv("TARGET_GROUP", "-1003488487424"))
+TARGET_GROUP = os.getenv("TARGET_GROUP", "@Devilapprovedcc")
 PYROGRAM_SESSION = os.getenv("PYROGRAM_SESSION", "")
 
 MAX_CONCURRENT_GROUPS = 3
@@ -92,7 +92,7 @@ async def get_all_groups_and_channels():
             dialog_count += 1
             chat = dialog.chat
             if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                if chat.id != TARGET_GROUP:
+                if chat.id != TARGET_GROUP and chat.username != TARGET_GROUP.lstrip("@"):
                     groups_and_channels.append({
                         "id": chat.id,
                         "title": chat.title or f"Chat_{chat.id}",
@@ -146,7 +146,6 @@ def extract_credit_cards(text):
             if len(match) == 4:
                 card_number, month, year, cvv = match
                 card_number = re.sub(r'[\s\-]', '', card_number)
-
                 if 13 <= len(card_number) <= 19 and 1 <= int(month) <= 12 and len(cvv) >= 3:
                     if len(year) == 4:
                         year = year[-2:]
@@ -344,19 +343,6 @@ async def init_group(group_info):
     except Exception:
         last_processed_message_ids[group_id] = 0
 
-async def test_access():
-    try:
-        async for dialog in user.get_dialogs():
-            chat = dialog.chat
-            if chat.id == TARGET_GROUP:
-                logger.info(f"✅ Target found in dialogs: {chat.title} ({chat.id})")
-                return True
-        logger.error("❌ Target group not found in dialogs")
-        return False
-    except Exception as e:
-        logger.error(f"❌ Access check failed: {e}")
-        return False
-
 def signal_handler(signum, frame):
     global is_running
     logger.info(f"🛑 Received signal {signum}, shutting down gracefully...")
@@ -389,20 +375,17 @@ async def main():
         except Exception as e:
             logger.warning(f"⚠️ Could not get user info: {e}")
 
-        if await test_access():
-            polling_task = asyncio.create_task(poll_multiple_groups())
-            try:
-                await idle()
-            finally:
-                is_running = False
-                if not polling_task.done():
-                    polling_task.cancel()
-                    try:
-                        await asyncio.wait_for(polling_task, timeout=5.0)
-                    except Exception:
-                        pass
-        else:
-            logger.error("❌ Cannot proceed without proper access")
+        polling_task = asyncio.create_task(poll_multiple_groups())
+        try:
+            await idle()
+        finally:
+            is_running = False
+            if not polling_task.done():
+                polling_task.cancel()
+                try:
+                    await asyncio.wait_for(polling_task, timeout=5.0)
+                except Exception:
+                    pass
     except Exception as e:
         logger.error(f"❌ Error in main: {e}")
     finally:
