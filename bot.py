@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 PHONE_NUMBER = os.getenv("PHONE_NUMBER", "")
-SOURCE_GROUP = os.getenv("SOURCE_GROUP", "@Devilapprovedcc")
+SOURCE_GROUP = int(os.getenv("SOURCE_GROUP", "-1003488487424"))
 TARGET_GROUP = os.getenv("TARGET_GROUP", "@ccdumpgroup")
 PYROGRAM_SESSION = os.getenv("PYROGRAM_SESSION", "")
 
@@ -93,7 +93,7 @@ async def get_all_groups_and_channels():
             dialog_count += 1
             chat = dialog.chat
             if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                if chat.id != SOURCE_GROUP and chat.username != SOURCE_GROUP.lstrip("@"):
+                if chat.id != SOURCE_GROUP:
                     groups_and_channels.append({
                         "id": chat.id,
                         "title": chat.title or f"Chat_{chat.id}",
