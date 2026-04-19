@@ -146,6 +146,7 @@ def extract_credit_cards(text):
             if len(match) == 4:
                 card_number, month, year, cvv = match
                 card_number = re.sub(r'[\s\-]', '', card_number)
+
                 if 13 <= len(card_number) <= 19 and 1 <= int(month) <= 12 and len(cvv) >= 3:
                     if len(year) == 4:
                         year = year[-2:]
@@ -345,11 +346,15 @@ async def init_group(group_info):
 
 async def test_access():
     try:
-        target_chat = await user.get_chat(TARGET_GROUP)
-        logger.info(f"✅ Access confirmed: {target_chat.title} ({target_chat.id})")
-        return True
+        async for dialog in user.get_dialogs():
+            chat = dialog.chat
+            if chat.id == TARGET_GROUP:
+                logger.info(f"✅ Target found in dialogs: {chat.title} ({chat.id})")
+                return True
+        logger.error("❌ Target group not found in dialogs")
+        return False
     except Exception as e:
-        logger.error(f"❌ Cannot access target group: {e}")
+        logger.error(f"❌ Access check failed: {e}")
         return False
 
 def signal_handler(signum, frame):
