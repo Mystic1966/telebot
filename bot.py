@@ -56,7 +56,6 @@ def is_approved_message(text):
         return False
 
     text_lower = text.lower()
-
     approved_patterns = [
         r'approved\s*✅',
         r'𝗔𝗣𝗣𝗥𝗢𝗩𝗘𝗗\s*✅',
@@ -81,7 +80,6 @@ def is_approved_message(text):
         r'LIVE',
         r'Card added',
     ]
-
     return any(re.search(pattern, text_lower, re.IGNORECASE) for pattern in approved_patterns)
 
 async def get_all_groups_and_channels():
@@ -93,7 +91,6 @@ async def get_all_groups_and_channels():
         async for dialog in user.get_dialogs():
             dialog_count += 1
             chat = dialog.chat
-
             if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
                 if chat.id != TARGET_GROUP:
                     groups_and_channels.append({
@@ -149,7 +146,6 @@ def extract_credit_cards(text):
             if len(match) == 4:
                 card_number, month, year, cvv = match
                 card_number = re.sub(r'[\s\-]', '', card_number)
-
                 if 13 <= len(card_number) <= 19 and 1 <= int(month) <= 12 and len(cvv) >= 3:
                     if len(year) == 4:
                         year = year[-2:]
@@ -350,7 +346,7 @@ async def init_group(group_info):
 async def test_access():
     try:
         target_chat = await user.get_chat(TARGET_GROUP)
-        logger.info(f"✅ Access confirmed: {target_chat.title}")
+        logger.info(f"✅ Access confirmed: {target_chat.title} ({target_chat.id})")
         return True
     except Exception as e:
         logger.error(f"❌ Cannot access target group: {e}")
