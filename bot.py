@@ -47,15 +47,22 @@ REQUEST_DELAY = 1.0
 INIT_BATCH_SIZE = 5
 INIT_DELAY = 2.0
 
-user = Client(
-    "cc_monitor_user",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    phone_number=PHONE_NUMBER,
-    workers=50,
-    sleep_threshold=45,
-    max_concurrent_transmissions=10
-)
+user = None
+
+async def main():
+    global user
+    user = Client(
+        "cc_monitor_user",
+        api_id=int(API_ID),
+        api_hash=API_HASH,
+        phone_number=PHONE_NUMBER,
+        workers=50,
+        sleep_threshold=45,
+        max_concurrent_transmissions=10
+    )
+    await user.start()
+    ...
+
 
 is_running = True
 last_processed_message_ids = {}
