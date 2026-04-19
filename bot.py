@@ -60,8 +60,10 @@ async def main():
         sleep_threshold=45,
         max_concurrent_transmissions=10
     )
+
+    logger.info("🔄 Starting RATE-LIMITED CC Monitor Bot...")
     await user.start()
-    ...
+
 
 
 is_running = True
