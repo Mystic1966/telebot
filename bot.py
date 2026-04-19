@@ -9,14 +9,10 @@ import sys
 from pyrogram.enums import ParseMode, ChatType
 from pyrogram import Client, idle
 from pyrogram.errors import (
-    UserAlreadyParticipant,
-    InviteHashExpired,
-    InviteHashInvalid,
     PeerIdInvalid,
     ChannelPrivate,
     UsernameNotOccupied,
     FloodWait,
-    RPCError
 )
 
 try:
@@ -83,7 +79,7 @@ def is_approved_message(text):
         r'Charged',
         r'charged',
         r'LIVE',
-        r'Card added'
+        r'Card added',
     ]
 
     return any(re.search(pattern, text_lower, re.IGNORECASE) for pattern in approved_patterns)
@@ -101,10 +97,10 @@ async def get_all_groups_and_channels():
             if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
                 if chat.id != TARGET_GROUP:
                     groups_and_channels.append({
-                        'id': chat.id,
-                        'title': chat.title or f"Chat_{chat.id}",
-                        'type': str(chat.type),
-                        'username': getattr(chat, 'username', None)
+                        "id": chat.id,
+                        "title": chat.title or f"Chat_{chat.id}",
+                        "type": str(chat.type),
+                        "username": getattr(chat, "username", None)
                     })
                 else:
                     logger.info(f"⚠️ Skipped target group: {chat.title} - ID: {chat.id}")
@@ -191,12 +187,12 @@ def format_card_message(cc_data, bin_info):
     country_emoji = "🌍"
 
     if bin_info:
-        brand = bin_info.get('brand', 'UNKNOWN')
+        brand = bin_info.get("brand", "UNKNOWN")
         scheme = brand
-        card_type = bin_info.get('type', 'UNKNOWN').upper()
-        bank_name = bin_info.get('bank', 'UNKNOWN BANK')
-        country_name = bin_info.get('country_name', 'UNKNOWN')
-        country_emoji = bin_info.get('country_flag', '🌍')
+        card_type = bin_info.get("type", "UNKNOWN").upper()
+        bank_name = bin_info.get("bank", "UNKNOWN BANK")
+        country_name = bin_info.get("country_name", "UNKNOWN")
+        country_emoji = bin_info.get("country_flag", "🌍")
 
     return f"""𝘾𝘼𝙍𝘿 ⇾ {cc_data}
 𝙎𝙏𝘼𝙏𝙐𝙎 ⇾ 𝘈𝘱𝘱𝘳𝘖𝘝𝘌𝘋 💎
@@ -247,7 +243,7 @@ async def process_message_for_approved_ccs(message, source_group_id, group_title
 
 async def process_single_cc(cc_data):
     try:
-        bin_number = cc_data.split('|')[0][:6]
+        bin_number = cc_data.split("|")[0][:6]
         bin_info = await get_bin_info(bin_number)
         formatted_message = format_card_message(cc_data, bin_info)
         await send_to_target_group(formatted_message, cc_data)
@@ -265,8 +261,8 @@ async def process_group_batch(group_batch):
             pass
 
 async def process_single_group(group_info):
-    group_id = group_info['id']
-    group_title = group_info['title']
+    group_id = group_info["id"]
+    group_title = group_info["title"]
 
     try:
         messages = await safe_get_chat_history(group_id, limit=MESSAGE_BATCH_SIZE)
@@ -282,11 +278,11 @@ async def process_single_group(group_info):
 
         if new_messages:
             new_messages.reverse()
-            message_tasks = [
+            tasks = [
                 asyncio.create_task(process_message_for_approved_ccs(message, group_id, group_title))
                 for message in new_messages
             ]
-            await asyncio.gather(*message_tasks, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
 
             last_processed_message_ids[group_id] = max(
                 last_processed_message_ids.get(group_id, 0),
@@ -296,7 +292,7 @@ async def process_single_group(group_info):
         pass
 
 async def poll_multiple_groups():
-    global last_processed_message_ids, is_running, source_groups
+    global is_running, source_groups
     logger.info("🔄 Starting RATE-LIMITED multi-group polling...")
 
     source_groups = await get_all_groups_and_channels()
@@ -351,49 +347,13 @@ async def init_group(group_info):
     except Exception:
         last_processed_message_ids[group_id] = 0
 
-async def join_target_group():
-    try:
-        try:
-            target_chat = await user.get_chat(TARGET_GROUP)
-            logger.info(f"✅ Already have access to target group: {target_chat.title}")
-            return True
-        except Exception:
-            logger.info(f"⚠️ Need to join target group {TARGET_GROUP}")
-
-        invite_link = "https://t.me/+TsJYw8k_KHxjZDc8"
-        logger.info("🔗 Attempting to join target group via invite link...")
-
-        try:
-            await user.join_chat(invite_link)
-            logger.info("✅ Successfully joined target group!")
-            await asyncio.sleep(2)
-            target_chat = await user.get_chat(TARGET_GROUP)
-            logger.info(f"✅ Confirmed access to: {target_chat.title}")
-            return True
-        except UserAlreadyParticipant:
-            return True
-        except (InviteHashExpired, InviteHashInvalid):
-            return False
-        except Exception as e:
-            logger.error(f"❌ Failed to join target group: {e}")
-            return False
-    except Exception as e:
-        logger.error(f"❌ Error in join_target_group: {e}")
-        return False
-
 async def test_access():
     try:
-        if not await join_target_group():
-            return False
-        global source_groups
-        source_groups = await get_all_groups_and_channels()
-        if not source_groups:
-            logger.error("❌ No groups found to monitor!")
-            return False
-        logger.info(f"✅ Found {len(source_groups)} groups/channels to monitor")
+        target_chat = await user.get_chat(TARGET_GROUP)
+        logger.info(f"✅ Access confirmed: {target_chat.title}")
         return True
     except Exception as e:
-        logger.error(f"❌ Error in test_access: {e}")
+        logger.error(f"❌ Cannot access target group: {e}")
         return False
 
 def signal_handler(signum, frame):
@@ -402,8 +362,7 @@ def signal_handler(signum, frame):
     is_running = False
 
 async def main():
-    global is_running, processing_semaphore, user
-    processing_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GROUPS)
+    global user
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -412,12 +371,12 @@ async def main():
             raise RuntimeError("PYROGRAM_SESSION env var is missing")
 
         user = Client(
-    "my_account",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    phone_number=PHONE_NUMBER,
-    session_string=PYROGRAM_SESSION
-)
+            "my_account",
+            api_id=API_ID,
+            api_hash=API_HASH,
+            phone_number=PHONE_NUMBER,
+            session_string=PYROGRAM_SESSION
+        )
 
         logger.info("🔄 Starting bot...")
         await user.start()
@@ -429,8 +388,7 @@ async def main():
         except Exception as e:
             logger.warning(f"⚠️ Could not get user info: {e}")
 
-        access_ok = await test_access()
-        if access_ok:
+        if await test_access():
             polling_task = asyncio.create_task(poll_multiple_groups())
             try:
                 await idle()
