@@ -412,11 +412,12 @@ async def main():
             raise RuntimeError("PYROGRAM_SESSION env var is missing")
 
         user = Client(
-            PYROGRAM_SESSION,
-            api_id=API_ID,
-            api_hash=API_HASH,
-            phone_number=PHONE_NUMBER
-        )
+    "my_account",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    phone_number=PHONE_NUMBER,
+    session_string=PYROGRAM_SESSION
+)
 
         logger.info("🔄 Starting bot...")
         await user.start()
