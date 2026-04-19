@@ -4,6 +4,7 @@ import logging
 import aiohttp
 import signal
 import sys
+import os
 from datetime import datetime, timedelta
 from pyrogram.enums import ParseMode, ChatType
 from pyrogram import Client, filters, idle
@@ -31,10 +32,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-API_ID = "28708347"
-API_HASH = "4fa9a7becae9889c9052871a24facfac"
-PHONE_NUMBER = "+92"
-TARGET_GROUP = -1002732639317
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+PHONE_NUMBER = os.getenv("PHONE_NUMBER")
+TARGET_GROUP = int(os.getenv("TARGET_GROUP", "-1002732639317"))
 
 MAX_CONCURRENT_GROUPS = 3
 MESSAGE_BATCH_SIZE = 20
