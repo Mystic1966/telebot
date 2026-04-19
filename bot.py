@@ -190,24 +190,31 @@ async def send_to_target_group(formatted_message, cc_data):
 async def process_message_for_approved_ccs(message, group_title="Unknown"):
     global processed_messages
     try:
-        if message.id in processed_messages:
+        unique_key = f"{message.chat.id}:{message.id}"
+        if unique_key in processed_messages:
             return
-        processed_messages.add(message.id)
+        processed_messages.add(unique_key)
 
         if len(processed_messages) > 5000:
             processed_messages = set(list(processed_messages)[-2000:])
 
-        text = normalize_text(message.text or message.caption)
+        text = (message.text or message.caption or "").strip()
+        logger.info(f"DEBUG chat={message.chat.id} msg={message.id} text={text[:150]!r}")
+
         if not text:
             return
 
         if not is_approved_message(text):
+            logger.info(f"DEBUG skipped approved=False chat={message.chat.id} msg={message.id}")
             return
 
         fields = extract_message_fields(text)
         credit_cards = extract_credit_cards(text)
 
+        logger.info(f"DEBUG approved=True cards={credit_cards} fields={fields}")
+
         if not credit_cards:
+            logger.info(f"DEBUG no card match chat={message.chat.id} msg={message.id}")
             return
 
         logger.info(f"🎯 {len(credit_cards)} CCs from {group_title[:20]}")
